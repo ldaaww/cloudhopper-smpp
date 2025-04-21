@@ -570,29 +570,28 @@ public class DefaultSmppSession implements SmppServerSession, SmppSessionChannel
                 return;
             }
         }
-
+    
         // encode the pdu into a buffer
         ChannelBuffer buffer = transcoder.encode(pdu);
-
+    
         // we need to log the PDU after encoding since some things only happen
         // during the encoding process such as looking up the result message
         if (configuration.getLoggingOptions().isLogPduEnabled()) {
             logger.info("send PDU: {}", pdu);
         }
-
-        // write the pdu out & wait timeout amount of time
+    
+        // write the pdu out without waiting
         ChannelFuture channelFuture = this.channel.write(buffer);
-        //REQUESTED BY SERGEI VETUNIEV FOR TESTING
-        if(!channelFuture.await(10000))
-            throw new SmppChannelException(channelFuture.getCause() != null ? channelFuture.getCause().getMessage() 
-                    : "ChannelFuture failed without cause." , channelFuture.getCause());
         
-        // check if the write was a success
-        if (!channelFuture.isSuccess()) {
-            // the write failed, make sure to throw an exception
-            throw new SmppChannelException(channelFuture.getCause() != null ? channelFuture.getCause().getMessage() 
-                    : "ChannelFuture failed without cause." , channelFuture.getCause());
-        }
+        // 添加监听器来处理写入结果
+        channelFuture.addListener(new ChannelFutureListener() {
+            @Override
+            public void operationComplete(ChannelFuture future) {
+                if (!future.isSuccess()) {
+                    logger.error("Failed to send response PDU: {}", future.getCause());
+                }
+            }
+        });
     }
 
     @SuppressWarnings("unchecked")
